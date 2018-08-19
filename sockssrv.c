@@ -31,6 +31,7 @@
 #include <signal.h>
 #include <sys/select.h>
 #include <arpa/inet.h>
+#include <sys/time.h>
 #include <errno.h>
 #include <limits.h>
 #include "server.h"
@@ -369,7 +370,7 @@ static void zero_arg(char *s) {
 	for(i=0;i<l;i++) s[i] = 0;
 }
 
-int main(int argc, char** argv) {
+int socks_main(int argc, char** argv) {
 	int c;
 	const char *listenip = "0.0.0.0";
 	unsigned port = 1080;
