@@ -50,6 +50,7 @@ enum socks5_socket_type {
     UDP_SOCKET =2,
 };
 
-#define MAX_DNS_LEN  (2 << 8 - 1)
+#define MAX_DNS_LEN    ((2 << 8) - 1)
+#define MAX_SOCKS5_ADR_LEN MAX_DNS_LEN
 
 #endif

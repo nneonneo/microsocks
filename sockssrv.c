@@ -97,22 +97,10 @@ static void dolog(const char* fmt, ...) { }
 
 struct socks5_addrport {
     enum socks5_addr_type type;
-    char* addr;
+    char addr[MAX_SOCKS5_ADR_LEN];
     unsigned short port;
 };
 
-struct socks5_addrport* newSocks5Addrport(enum socks5_addr_type type, const char* addr, unsigned char* port) {
-    struct socks5_addrport* ap = malloc(sizeof (struct socks5_addrport));
-    ap->type = type;
-    ap->addr = strdup(addr);
-    ap->port = (port[0] << 8) | port[1];
-    return ap;
-}
-
-void deleteSocks5Addrport(struct socks5_addrport* addrport) {
-    free(addrport->addr);
-    free(addrport);
-}
 
 int compareSocks5Addrport(const struct socks5_addrport* addrport1, const struct socks5_addrport* addrport2) {
     if (addrport1->type == addrport2->type && 
@@ -139,7 +127,7 @@ int resolveSocks5Addrport(struct socks5_addrport* addrport, enum socks5_socket_t
     return 0;
 }
 
-static int parse_addrport(unsigned char *buf, size_t n, struct socks5_addrport** addrport) {
+static int parse_addrport(unsigned char *buf, size_t n, struct socks5_addrport* addrport) {
     assert(addrport != NULL);
     if (n < 2) return -EC_GENERAL_FAILURE;
     int af = AF_INET;
@@ -168,7 +156,9 @@ static int parse_addrport(unsigned char *buf, size_t n, struct socks5_addrport**
             return -EC_ADDRESSTYPE_NOT_SUPPORTED;
     }
     
-    *addrport = newSocks5Addrport(type, namebuf, &buf[minlen-2]);
+    addrport->type = type;
+    strncpy(addrport->addr, namebuf, sizeof addrport->addr);
+    addrport->port = (buf[minlen-2] << 8) | buf[minlen-1];
     return minlen;
 }
 
@@ -180,15 +170,13 @@ static int parse_socks_request_header(unsigned char *buf, size_t n, int* cmd, un
     *cmd = buf[1];
     if(buf[2] != RSV) return -EC_GENERAL_FAILURE; /* malformed packet */
 
-    struct socks5_addrport *addrport;
+    struct socks5_addrport addrport;
     int ret = parse_addrport(buf + 3, n - 3, &addrport);
     if (ret < 0) {
-        deleteSocks5Addrport(addrport);
         return ret;
     }
     int socktype = *cmd == CONNECT? TCP_SOCKET : UDP_SOCKET;
-    ret = resolveSocks5Addrport(addrport, socktype, svc_addr);
-    deleteSocks5Addrport(addrport);
+    ret = resolveSocks5Addrport(&addrport, socktype, svc_addr);
     if (ret < 0) return ret;
     return EC_SUCCESS;
 }
@@ -356,7 +344,7 @@ static void copyloop(int fd1, int fd2) {
 }
 
 // caller must free socks5_addr manually
-static ssize_t extract_udp_data(unsigned char* buf, ssize_t n, struct socks5_addrport** addrport) {
+static ssize_t extract_udp_data(unsigned char* buf, ssize_t n, struct socks5_addrport* addrport) {
     if (n < 3) return -EC_GENERAL_FAILURE;
     if (buf[0] != RSV || buf[1] != RSV) return -EC_GENERAL_FAILURE;
     if (buf[2] != 0) return -EC_GENERAL_FAILURE;  // framentation not supported
@@ -374,7 +362,7 @@ static ssize_t extract_udp_data(unsigned char* buf, ssize_t n, struct socks5_add
 
 struct fd_socks5addr {
     int fd;
-    struct socks5_addrport* addrport;
+    struct socks5_addrport addrport;
 };
 
 int compare_fd_socks5addr_by_fd(char* item1, char* item2) {
@@ -387,7 +375,7 @@ int compare_fd_socks5addr_by_fd(char* item1, char* item2) {
 int compare_fd_socks5addr_by_addrport(char* item1, char* item2) {
     struct fd_socks5addr* ap1 = ( struct fd_socks5addr*)item1;
     struct fd_socks5addr* ap2 = ( struct fd_socks5addr*)item2;
-    return compareSocks5Addrport(ap1->addrport, ap2->addrport);
+    return compareSocks5Addrport(&ap1->addrport, &ap2->addrport);
 }
 
 static void copy_loop_udp(int tcp_fd, int udp_fd) {
@@ -463,29 +451,21 @@ static void copy_loop_udp(int tcp_fd, int udp_fd) {
 								dprintf(1, "fd %d is bound now\n", udp_fd);
             }
         
-            struct socks5_addrport* addrport;
-            ssize_t offset = extract_udp_data(buf, n, &addrport);
+            ssize_t offset = extract_udp_data(buf, n, &item.addrport);
             if (offset < 0) {
                 dprintf(2, "failed to extract from udp packet %ld", offset);
                 goto UDP_LOOP_END;
             }
 
-            if (CONFIG_LOG) {
-                dolog("UDP target address is %s:%d\n", addrport->addr, addrport->port);
-            }
-
             int send_fd = 0;
-            item.addrport = addrport;
             int idx = sblist_search(sock_list, (char*)&item, compare_fd_socks5addr_by_addrport);
             if (idx != -1) {
-                deleteSocks5Addrport(addrport);
                 struct fd_socks5addr* item_found = (struct fd_socks5addr*)sblist_item_from_index(sock_list, idx);
                 send_fd = item_found->fd;
             } else {
                 union sockaddr_union target_addr;
-                ret = resolveSocks5Addrport(addrport, UDP_SOCKET, &target_addr);
+                ret = resolveSocks5Addrport(&item.addrport, UDP_SOCKET, &target_addr);
                 if (ret < 0) {
-                    deleteSocks5Addrport(addrport);
                     dprintf(2, "failed to resolve socks5 addrport, %ld", ret);
                     goto UDP_LOOP_END;
                 }
@@ -497,10 +477,7 @@ static void copy_loop_udp(int tcp_fd, int udp_fd) {
                     send_error(tcp_fd, EC_GENERAL_FAILURE);
                     goto UDP_LOOP_END;
                 }
-                // save the data into buffer list, no need to free socks5_addr now
                 item.fd = fd;
-                //  no need to delete addrport
-                item.addrport = addrport;
                 sblist_add(sock_list, &item);
 
                 // add to polling fds
@@ -538,11 +515,11 @@ static void copy_loop_udp(int tcp_fd, int udp_fd) {
                 struct fd_socks5addr *item = (struct fd_socks5addr*)sblist_item_from_index(sock_list, idx);
                 buf[0] = RSV, buf[1] = RSV;
                 buf[2] = 0; // FRAG
-                struct socks5_addrport* addrport = item->addrport;
+                struct socks5_addrport* addrport = &item->addrport;
                 buf[3] = addrport->type;
                 size_t offset = 4;
                 if (addrport->type == SOCKS5_DNS) {
-                    size_t len = strlen(item->addrport->addr);
+                    size_t len = strlen(item->addrport.addr);
                     buf[offset++] = len;
                     memcpy(buf + offset, addrport->addr, len);
                 } else if (addrport->type == SOCKS5_IPV4) {
