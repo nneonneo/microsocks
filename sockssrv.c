@@ -559,6 +559,7 @@ static void copy_loop_udp(int tcp_fd, int udp_fd) {
 UDP_LOOP_END:
     int i;
     for (i = 2; i < poll_fds; i++) close(fds[i].fd);
+    sblist_free(sock_list);
 }
 
 static enum errorcode check_credentials(unsigned char* buf, size_t n) {
