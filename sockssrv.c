@@ -97,7 +97,7 @@ static void dolog(const char* fmt, ...) { }
 
 struct socks5_addrport {
     enum socks5_addr_type type;
-    char addr[MAX_SOCKS5_ADR_LEN];
+    char addr[MAX_DNS_LEN + 1];
     unsigned short port;
 };
 
@@ -132,7 +132,7 @@ static int parse_addrport(unsigned char *buf, size_t n, struct socks5_addrport* 
     if (n < 2) return -EC_GENERAL_FAILURE;
     int af = AF_INET;
     int minlen = 1 + 4 + 2, l;
-    char namebuf[256];
+    char namebuf[MAX_DNS_LEN + 1];
 
     enum socks5_addr_type type = buf[0];
     switch(type) {
@@ -149,7 +149,7 @@ static int parse_addrport(unsigned char *buf, size_t n, struct socks5_addrport* 
             l = buf[1];
             minlen = 1 + (1 + l) + 2 ;
             if(n < minlen) return -EC_GENERAL_FAILURE;
-            memcpy(namebuf, buf+1+1, l);
+            memcpy(namebuf, buf+2, l);
             namebuf[l] = 0;
             break;
         default:
@@ -157,7 +157,8 @@ static int parse_addrport(unsigned char *buf, size_t n, struct socks5_addrport* 
     }
     
     addrport->type = type;
-    strncpy(addrport->addr, namebuf, sizeof addrport->addr);
+    addrport->addr[sizeof addrport->addr - 1] = '\0';
+    strncpy(addrport->addr, namebuf, sizeof addrport->addr -1);
     addrport->port = (buf[minlen-2] << 8) | buf[minlen-1];
     return minlen;
 }
@@ -411,8 +412,8 @@ static void copy_loop_udp(int tcp_fd, int udp_fd) {
                 goto UDP_LOOP_END;
         }
 
-         // TODO: only support up to around 4K size of UDP message
-        unsigned char buf[4096];
+        // support up to 1024 bytes of data
+        unsigned char buf[MAX_SOCKS5_HEADER_LEN + 1024];
         // TCP socket
         if (fds[0].revents & POLLIN) {
             n = read(fds[0].fd, buf, sizeof(buf) - 1);
@@ -433,9 +434,9 @@ static void copy_loop_udp(int tcp_fd, int udp_fd) {
         if (fds[1].revents & POLLIN) {
             if (!udp_is_bound) {
                 socklen = sizeof client_addr;
-                n = recvfrom(udp_fd, buf, sizeof(buf) - 1, 0, (struct sockaddr*)&client_addr, &socklen);
+                n = recvfrom(udp_fd, buf, sizeof(buf), 0, (struct sockaddr*)&client_addr, &socklen);
             } else {
-                n = recv(udp_fd, buf, sizeof(buf) - 1, 0);
+                n = recv(udp_fd, buf, sizeof(buf), 0);
             }
             if (n == -1) {
                 if(errno == EINTR || errno == EAGAIN) continue;
@@ -448,7 +449,7 @@ static void copy_loop_udp(int tcp_fd, int udp_fd) {
                     goto UDP_LOOP_END;
                 }
                 udp_is_bound = 1;
-								dprintf(1, "fd %d is bound now\n", udp_fd);
+				dprintf(1, "fd %d is bound now\n", udp_fd);
             }
         
             ssize_t offset = extract_udp_data(buf, n, &item.addrport);
@@ -522,6 +523,7 @@ static void copy_loop_udp(int tcp_fd, int udp_fd) {
                     size_t len = strlen(item->addrport.addr);
                     buf[offset++] = len;
                     memcpy(buf + offset, addrport->addr, len);
+                    offset += len;
                 } else if (addrport->type == SOCKS5_IPV4) {
                     struct in_addr addr_in4;
                     if (1 != inet_pton(AF_INET, addrport->addr, &addr_in4)) {

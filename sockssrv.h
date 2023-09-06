@@ -51,6 +51,6 @@ enum socks5_socket_type {
 };
 
 #define MAX_DNS_LEN    ((2 << 8) - 1)
-#define MAX_SOCKS5_ADR_LEN MAX_DNS_LEN
+#define MAX_SOCKS5_HEADER_LEN (2 + 1 + 1 + 1 + MAX_DNS_LEN + 2)
 
 #endif
