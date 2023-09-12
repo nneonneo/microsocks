@@ -1,6 +1,12 @@
 MicroSocks - multithreaded, small, efficient SOCKS5 server.
 ===========================================================
 
+This is a fork from [MicroSocks - multithreaded, small, efficient SOCKS5 server](https://github.com/rofl0r/microsocks), which hardly seems to be still maintained at the moment.
+
+The changes in this fork include:
+1. add support for UDP ASSOCIATE
+2. removed bind address cmdline option `-b`, which appears to be somewhat confusing when UDP proxy is available
+
 a SOCKS5 service that you can run on your remote boxes to tunnel connections
 through them, if for some reason SSH doesn't cut it for you.
 
