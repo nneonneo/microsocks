@@ -5,20 +5,21 @@ prefix = /usr/local
 bindir = $(prefix)/bin
 
 PROG = microsocks
-SRCS =  sockssrv.c server.c sblist.c sblist_delete.c
+SRCS =  sockssrv.c server.c sblist.c
 OBJS = $(SRCS:.c=.o)
 
 LIBS = -lpthread
 
 CFLAGS += -Wall -std=c99
 
+INSTALL = ./install.sh
+
 -include config.mak
 
 all: $(PROG)
 
 install: $(PROG)
-	install -d $(DESTDIR)/$(bindir)
-	install -D -m 755 $(PROG) $(DESTDIR)/$(bindir)/$(PROG)
+	$(INSTALL) -D -m 755 $(PROG) $(DESTDIR)$(bindir)/$(PROG)
 
 clean:
 	rm -f $(PROG)

@@ -24,11 +24,11 @@ extern "C" {
  */
 
 typedef struct {
-	size_t itemsize;
-	size_t blockitems;
-	size_t count;
-	size_t capa;
-	char* items;
+    size_t itemsize;
+    size_t blockitems;
+    size_t count;
+    size_t capa;
+    char* items;
 } sblist;
 
 #define sblist_getsize(X) ((X)->count)
@@ -58,6 +58,10 @@ void sblist_sort(sblist *l, int (*compar)(const void *, const void *));
 /* insert element into presorted list, returns listindex of new entry or -1*/
 size_t sblist_insert_sorted(sblist* l, void* o, int (*compar)(const void *, const void *));
 
+typedef int (*item_compare)(char* item1, char* item2);
+
+int sblist_search(sblist* l, char* item1, item_compare cmp);
+
 #ifndef __COUNTER__
 #define __COUNTER__ __LINE__
 #endif
@@ -68,16 +72,16 @@ size_t sblist_insert_sorted(sblist* l, void* o, int (*compar)(const void *, cons
 
 // use with custom iterator variable
 #define sblist_iter_counter(LIST, ITER, PTR) \
-	for(size_t ITER = 0; (PTR = sblist_get(LIST, ITER)), ITER < sblist_getsize(LIST); ITER++)
+    for(size_t ITER = 0; (PTR = sblist_get(LIST, ITER)), ITER < sblist_getsize(LIST); ITER++)
 
 // use with custom iterator variable, which is predeclared
 #define sblist_iter_counter2(LIST, ITER, PTR) \
-	for(ITER = 0; (PTR = sblist_get(LIST, ITER)), ITER < sblist_getsize(LIST); ITER++)
+    for(ITER = 0; (PTR = sblist_get(LIST, ITER)), ITER < sblist_getsize(LIST); ITER++)
 
 // use with custom iterator variable, which is predeclared and signed
 // useful for a loop which can delete items from the list, and then decrease the iterator var.
 #define sblist_iter_counter2s(LIST, ITER, PTR) \
-	for(ITER = 0; (PTR = sblist_get(LIST, ITER)), ITER < (ssize_t) sblist_getsize(LIST); ITER++)
+    for(ITER = 0; (PTR = sblist_get(LIST, ITER)), ITER < (ssize_t) sblist_getsize(LIST); ITER++)
 
 
 // uses "magic" iterator variable
@@ -88,5 +92,3 @@ size_t sblist_insert_sorted(sblist* l, void* o, int (*compar)(const void *, cons
 #endif
 
 #endif
-
-//RcB: DEP "sblist.c"

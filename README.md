@@ -1,6 +1,12 @@
 MicroSocks - multithreaded, small, efficient SOCKS5 server.
 ===========================================================
 
+This is a fork from [MicroSocks - multithreaded, small, efficient SOCKS5 server](https://github.com/rofl0r/microsocks), which hardly seems to be still maintained at the moment.
+
+The changes in this fork include:
+1. add support for UDP ASSOCIATE
+2. removed bind address cmdline option `-b`, which appears to be somewhat confusing when UDP proxy is available
+
 a SOCKS5 service that you can run on your remote boxes to tunnel connections
 through them, if for some reason SSH doesn't cut it for you.
 
@@ -39,9 +45,9 @@ still, if optimized for size, *this* program when static linked against musl
 libc is not even 50 KB. that's easily usable even on the cheapest routers.
 
 command line options
-------------------------
+--------------------
 
-    microsocks -1 -i listenip -p port -u user -P password
+    microsocks -1 -i listenip -p port -u user -P password -b bindaddr
 
 all arguments are optional.
 by default listenip is 0.0.0.0 and port 1080.
@@ -52,3 +58,14 @@ and may use the proxy without auth.
 this is handy for programs like firefox that don't support
 user/pass auth. for it to work you'd basically make one connection
 with another program that supports it, and then you can use firefox too.
+for example, authenticate once using curl:
+
+    curl --socks5 user:password@listenip:port anyurl
+
+
+Supported SOCKS5 Features
+-------------------------
+- authentication: none, password, one-time
+- IPv4, IPv6, DNS
+- TCP (no UDP at this time)
+
