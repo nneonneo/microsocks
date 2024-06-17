@@ -394,7 +394,7 @@ static void copy_loop_udp(int tcp_fd, int udp_fd) {
     if (-1 == getpeername(udp_fd, (struct sockaddr*)&client_addr, &socklen)) {
         if (errno == ENOTCONN) {
             udp_is_bound = 0;
-						dprintf(1, "fd %d is not bound yet\n", udp_fd);
+            dprintf(1, "fd %d is not bound yet\n", udp_fd);
         } else {
             abort();
         }
@@ -450,7 +450,7 @@ static void copy_loop_udp(int tcp_fd, int udp_fd) {
                     goto UDP_LOOP_END;
                 }
                 udp_is_bound = 1;
-				dprintf(1, "fd %d is bound now\n", udp_fd);
+                dprintf(1, "fd %d is bound now\n", udp_fd);
             }
         
             ssize_t offset = extract_udp_data(buf, n, &item.addrport);
@@ -474,7 +474,7 @@ static void copy_loop_udp(int tcp_fd, int udp_fd) {
 
                 // create a new socket
                 int fd = socket(SOCKADDR_UNION_AF(&target_addr), SOCK_DGRAM, 0);
-                if (-1 == connect(fd, (const struct sockaddr*)&target_addr, sizeof(target_addr))) {
+                if (-1 == connect(fd, (const struct sockaddr*)&target_addr, ((const struct sockaddr*)&target_addr)->sa_len)) {
                     perror("connect");
                     send_error(tcp_fd, EC_GENERAL_FAILURE);
                     goto UDP_LOOP_END;
@@ -515,7 +515,8 @@ static void copy_loop_udp(int tcp_fd, int udp_fd) {
                     goto UDP_LOOP_END;
                 }
                 struct fd_socks5addr *item = (struct fd_socks5addr*)sblist_item_from_index(sock_list, idx);
-                buf[0] = RSV, buf[1] = RSV;
+                buf[0] = RSV;
+                buf[1] = RSV;
                 buf[2] = 0; // FRAG
                 struct socks5_addrport* addrport = &item->addrport;
                 buf[3] = addrport->type;
@@ -560,8 +561,8 @@ static void copy_loop_udp(int tcp_fd, int udp_fd) {
         }
     }
 UDP_LOOP_END:
-    int i;
-    for (i = 2; i < poll_fds; i++) close(fds[i].fd);
+    for (int i = 2; i < poll_fds; i++)
+        close(fds[i].fd);
     sblist_free(sock_list);
 }
 
@@ -670,6 +671,7 @@ static void* clientthread(void *data) {
                 }
                 break;
             case SS_3_AUTHED:
+                (void)0;
                 int cmd;
                 ret = parse_socks_request_header(buf, n, &cmd, &address);
                 if (ret != EC_SUCCESS) {
